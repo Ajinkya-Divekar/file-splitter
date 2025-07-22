@@ -1,0 +1,73 @@
+.pdf-container {
+  background: #f0f0f0;
+  overflow-x: auto;
+}
+
+.pdf-strip-wrapper {
+  overflow-x: auto;
+  border: 1px solid #ccc;
+  max-height: 70vh;
+  min-height: 60vh;
+}
+
+.pdf-strip {
+  display: flex;
+  position: relative;
+  align-items: center;
+}
+
+.pdf-box {
+  position: relative;
+  display: flex;
+}
+
+.drag-line {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: rgb(37, 61, 200);
+  z-index: 10;
+  cursor: ew-resize;
+}
+
+.snap-target {
+  width: 1px;
+  height: 100%;
+  border: 1px dashed #ccc;
+  position: relative;
+}
+
+.debug {
+  pointer-events: none;
+}
+
+.split-layout {
+  display: flex;
+}
+
+.meta-panel {
+  width: 200px;
+  padding: 16px;
+  background: #fff;
+  border-right: 1px solid #ccc;
+  font-family: sans-serif;
+  font-size: 14px;
+}
+
+.meta-item {
+  margin-bottom: 12px;
+}
+
+.pdf-box {
+  position: relative;
+  margin-right: 10px;
+  overflow: visible;
+  z-index: 0;
+}
+
+::ng-deep .textLayer {
+  z-index: 2 !important;
+  opacity: 1 !important;
+  pointer-events: none;
+}

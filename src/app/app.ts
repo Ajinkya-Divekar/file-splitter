@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { PdfViewerModule } from 'ng2-pdf-viewer';
+import { SplitReviewer } from './split-reviewer/split-reviewer';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [PdfViewerModule, SplitReviewer],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.css',
 })
 export class App {
   protected title = 'file-splitter';
