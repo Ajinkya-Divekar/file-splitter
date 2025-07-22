@@ -27,8 +27,53 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
   pdfSrc = 'https://vadimdez.github.io/ng2-pdf-viewer/assets/pdf-test.pdf';
   pages: number[] = [];
 
+  resData = {
+    input_tokens: 1075,
+    output_files: [
+      {
+        is_multipage: true,
+        original_file_path:
+          'C:/Users/ajink/OneDrive/Desktop/documents\\Mohan R_ BGV Doc.pdf',
+        path: 'C:/Users/ajink/OneDrive/Desktop/documents\\Mohan R_ BGV Doc_employment-verification-form_1-2-3-4-5-6.pdf',
+        start_page: 1,
+      },
+      {
+        is_multipage: true,
+        original_file_path:
+          'C:/Users/ajink/OneDrive/Desktop/documents\\Mohan R_ BGV Doc.pdf',
+        path: "C:/Users/ajink/OneDrive/Desktop/documents\\Mohan R_ BGV Doc_master's-degree-documents_8-9-10-11-12-13.pdf",
+        start_page: 2,
+      },
+    ],
+    output_tokens: 387,
+    status: 'success',
+    status_code: '200',
+    total_tokens: 2157,
+  };
+
+  resSections: { start: number; end?: number; name: string }[] = [];
+
+  applyResData() {
+    // Step 1: Load snap points
+    this.snap_points = this.resData.output_files.map((f) => f.start_page);
+
+    // Step 2: Extract names from filename
+    this.resSections = this.resData.output_files.map((f) => {
+      const path = f.path;
+      const fileName = path.split('\\').pop()?.split('/').pop() || '';
+      const nameOnly = fileName.replace(/_/g, ' ').replace(/\.pdf$/, '');
+      return {
+        start: f.start_page,
+        name: nameOnly,
+      };
+    });
+
+    console.log('Loaded snap points from resData:', this.snap_points);
+    console.log('Section names:', this.resSections);
+  }
+
   snap_points = [1];
-  sections: { start: number; end: number }[] = [];
+  sections: { start: number; end: number; name: string }[] = [];
 
   @ViewChild('pdfStrip', { read: ElementRef }) pdfStripRef!: ElementRef;
   @ViewChildren('snapTarget', { read: ElementRef })
@@ -52,7 +97,9 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     return `${margin}%`;
   }
 
-  ngAfterViewInit(): void {}
+  ngAfterViewInit(): void {
+    this.applyResData();
+  }
 
   ngAfterViewChecked(): void {
     if (
@@ -168,28 +215,37 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
   printSegments() {
     console.log('printing segments');
 
-    const sorted = this.splitLines
-      .map((s) => this.snapPoints.indexOf(s.x))
-      .filter((i) => i !== -1)
-      .sort((a, b) => a - b);
+    if (!this.pages.length) return;
 
-    const segments = [];
-    const meta = [];
+    const totalPages = this.pages.length;
 
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const from = sorted[i];
-      const to = sorted[i + 1];
+    const enriched = this.resSections.map((section, index, arr) => {
+      const start = section.start;
+      const end =
+        index < arr.length - 1 ? arr[index + 1].start - 1 : totalPages;
 
-      if (from >= 0 && to > from && to <= this.pages.length) {
-        segments.push(this.pages.slice(from, to));
-        meta.push({
-          start: this.pages[from],
-          end: this.pages[to - 1],
-        });
-      }
-    }
+      // Extract clean name — keep only last part before page range
+      const rawName = section.name;
+      const cleanedName = rawName
+        .replace(/[_\\]/g, ' ') // Replace _ or \ with space (in case of paths)
+        .split(' ')
+        .filter((part) => !/^\d+(-\d+)*$/.test(part)) // Remove page range parts
+        .slice(-1)[0]; // Take last non-numbery chunk
 
-    this.sections = meta;
+      return {
+        start,
+        end,
+        name: cleanedName || `Section ${index + 1}`,
+      };
+    });
+
+    this.sections = enriched;
+
+    // Optional: Log each section with pages
+    const segments = enriched.map(({ start, end }) =>
+      this.pages.slice(start - 1, end)
+    );
+
     console.log('Split Segments:', segments);
   }
 }

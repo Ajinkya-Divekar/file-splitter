@@ -16,7 +16,7 @@
     <!-- 📌 LEFT: Metadata sidebar -->
     <div class="meta-panel">
       <div *ngFor="let section of sections; let i = index" class="meta-item">
-        <strong>Section {{ i + 1 }}:</strong><br />
+        <strong>{{ section.name }}</strong><br />
         Page: {{ section.start }} - {{ section.end }}
       </div>
     </div>
