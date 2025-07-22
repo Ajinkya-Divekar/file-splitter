@@ -32,7 +32,8 @@ interface SplitLine {
   styleUrls: ['./split-reviewer.css'],
 })
 export class SplitReviewer implements AfterViewInit, AfterViewChecked {
-  pdfSrc = 'https://vadimdez.github.io/ng2-pdf-viewer/assets/pdf-test.pdf';
+  pdfSrc =
+    'https://publicurl.factsuite.org/File_10653049_File2dd2acc9d8d8bf9f06bf5e4dcbae7010_aiqod_com2_Filefcb41c68ce650374fbe3900427831858_AUTOLI202507215354.pdf';
   pages: number[] = [];
 
   // Tracks which section indexes are expanded
