@@ -10,6 +10,8 @@ import {
 import { CommonModule } from '@angular/common';
 import { PdfViewerModule } from 'ng2-pdf-viewer';
 import { DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
+import { FormsModule } from '@angular/forms';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 
 interface SplitLine {
   x: number;
@@ -19,13 +21,36 @@ interface SplitLine {
 @Component({
   selector: 'app-split-reviewer',
   standalone: true,
-  imports: [CommonModule, PdfViewerModule, DragDropModule],
+  imports: [
+    CommonModule,
+    PdfViewerModule,
+    DragDropModule,
+    FormsModule,
+    HttpClientModule,
+  ],
   templateUrl: './split-reviewer.html',
   styleUrls: ['./split-reviewer.css'],
 })
 export class SplitReviewer implements AfterViewInit, AfterViewChecked {
   pdfSrc = 'https://vadimdez.github.io/ng2-pdf-viewer/assets/pdf-test.pdf';
   pages: number[] = [];
+
+  // Tracks which section indexes are expanded
+  expandedSections: Set<number> = new Set();
+
+  constructor(private http: HttpClient) {}
+
+  toggleSection(index: number) {
+    if (this.expandedSections.has(index)) {
+      this.expandedSections.delete(index);
+    } else {
+      this.expandedSections.add(index);
+    }
+  }
+
+  isExpanded(index: number): boolean {
+    return this.expandedSections.has(index);
+  }
 
   resData = {
     input_tokens: 1075,
@@ -91,7 +116,13 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     this.pdfLoaded = true;
   }
 
-  zoomLevel = 0.75;
+  zoomLevel = 0.95;
+  adjustZoom(change: number) {
+    const newZoom = this.zoomLevel + change;
+    this.zoomLevel = Math.min(0.95, Math.max(0.25, newZoom));
+    console.log('Zoom level:', this.zoomLevel);
+  }
+
   getZoomMarginPercent(zoomLevel: number): string {
     const margin = 10 + (1 - zoomLevel) * 75;
     return `${margin}%`;
@@ -158,11 +189,9 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     const draggedRect = draggedEl.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
 
-    // Calculate relativeX to container
     let relativeX =
       draggedRect.left - containerRect.left + container.scrollLeft;
 
-    // Drop is invalid if outside the vertical bounds
     const outOfBounds =
       draggedRect.bottom < containerRect.top ||
       draggedRect.top > containerRect.bottom;
@@ -170,13 +199,9 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     const originalX = this.originalXMap.get(index) ?? this.splitLines[index].x;
 
     if (outOfBounds) {
-      // ❌ Invalid drop → Reset position visually
       draggedEl.style.transition = 'transform 0.2s ease';
       draggedEl.style.transform = `translateX(${originalX}px)`;
-
-      // Also reset in model
       this.splitLines[index].x = originalX;
-
       setTimeout(() => {
         draggedEl.style.transition = '';
         draggedEl.style.transform = '';
@@ -186,7 +211,7 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
       return;
     }
 
-    // Snap to nearest valid snap point
+    // Snap to nearest snap point
     let nearest = this.snapPoints[0];
     let minDiff = Math.abs(relativeX - nearest);
     let nearestIndex = 0;
@@ -203,18 +228,17 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     const draggedLine = this.splitLines[index];
     const originalIndex = this.snapPoints.indexOf(draggedLine.x);
 
-    // Protect boundary: don't let leftmost go further left or rightmost go right
     const sorted = this.splitLines
       .map((l, i) => ({ x: l.x, i }))
       .sort((a, b) => a.x - b.x);
     const isLeftmost = sorted[0].i === index;
     const isRightmost = sorted[sorted.length - 1].i === index;
 
+    // Prevent dragging beyond allowed bounds
     if (
       (isLeftmost && nearestIndex <= originalIndex) ||
       (isRightmost && nearestIndex >= originalIndex)
     ) {
-      // Snap back
       draggedEl.style.transition = 'transform 0.2s ease';
       draggedEl.style.transform = `translateX(${originalX}px)`;
       this.splitLines[index].x = originalX;
@@ -227,31 +251,42 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
       return;
     }
 
+    // 🧹 Remove all lines that were crossed OR already exist at destination
+    const crossedMin = Math.min(originalX, nearest);
+    const crossedMax = Math.max(originalX, nearest);
+
+    this.splitLines = this.splitLines.filter((line, i) => {
+      if (i === index) return true; // keep dragged line
+      const isCrossed = line.x > crossedMin && line.x < crossedMax;
+      const isAtDestination = line.x === nearest;
+      return !isCrossed && !isAtDestination;
+    });
+
+    // 📌 Now handle locked/unlocked move
     if (draggedLine.locked) {
+      // Clone locked line, convert dragged to editable at new position
       this.splitLines.splice(index, 0, { x: draggedLine.x, locked: true });
       this.splitLines[index + 1] = { x: nearest, locked: false };
     } else {
       draggedLine.x = nearest;
     }
 
-    // Remove overlapping lines
-    const min = Math.min(originalIndex, nearestIndex);
-    const max = Math.max(originalIndex, nearestIndex);
-    this.splitLines = this.splitLines.filter((line, i) => {
-      const snapIdx = this.snapPoints.indexOf(line.x);
-      if (i === index) return true;
-      return snapIdx <= min || snapIdx >= max;
-    });
+    // ✅ Overlap cleanup for editable lines
+    const lockedLines = this.splitLines.filter((line) => line.locked);
+    const editableLines = this.splitLines.filter((line) => !line.locked);
 
-    const overlapThreshold = 1;
     const seen = new Set<number>();
-    this.splitLines = this.splitLines.filter((line) => {
+    const overlapThreshold = 1;
+
+    const filtered = editableLines.filter((line) => {
       for (const sx of seen) {
         if (Math.abs(sx - line.x) <= overlapThreshold) return false;
       }
       seen.add(line.x);
       return true;
     });
+
+    this.splitLines = [...lockedLines, ...filtered].sort((a, b) => a.x - b.x);
 
     this.snapPointElements.forEach((el, i) => {
       el.style.visibility = i === nearestIndex ? 'visible' : 'hidden';
@@ -264,6 +299,7 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
 
   printSegments() {
     console.log('printing segments');
+    console.log('Zoom level:', this.zoomLevel);
 
     const sorted = this.splitLines
       .map((s) => this.snapPoints.indexOf(s.x))
@@ -307,4 +343,108 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
 
     console.log('Split Segments:', segments);
   }
+
+  editingIndex: number | null = null;
+
+  enableEdit(index: number, event: MouseEvent) {
+    event.stopPropagation();
+    this.editingIndex = index;
+  }
+
+  disableEdit() {
+    this.editingIndex = null;
+  }
+
+  get sectionNames(): string[] {
+    return this.sections.map((s) => s.name);
+  }
+
+  get sectionStartPages(): number[] {
+    return this.sections.map((s) => s.start);
+  }
+
+  get sectionEndPages(): number[] {
+    return this.sections.map((s) => s.end);
+  }
+
+  onSaveSplit() {
+    console.log('Section Names:', this.sectionNames);
+    console.log('Start Pages:', this.sectionStartPages);
+    console.log('End Pages:', this.sectionEndPages);
+  }
+
+  tempResData: any = null;
+  tempSections: { start: number; end?: number; name: string }[] = [];
+
+  ngOnInit(): void {
+    const folderPath =
+      'C:/Users/ajink/OneDrive/Desktop/file-splitter/src/assets/documents';
+    this.sendFolderPath(folderPath);
+  }
+
+  sendFolderPath(folderPath: string) {
+    const payload = { folder_path: folderPath };
+    this.isLoading = true;
+
+    this.http.post('http://localhost:5000/process', payload).subscribe({
+      next: (response) => {
+        this.isLoading = false;
+        console.log('API Success:', response);
+        this.tempResData = response;
+
+        if (this.tempResData?.output_files) {
+          console.log(
+            'Received tempResData output files:',
+            this.tempResData.output_files
+          );
+
+          this.tempSections = this.tempResData.output_files.map((f: any) => {
+            const path = f.path;
+            const fileName =
+              path
+                .split(/[\\/]/)
+                .pop()
+                ?.replace(/\.pdf$/, '') || '';
+
+            // Extract possible page numbers from name (like _7 or _7-10 or space-separated)
+            const pageMatch = fileName.match(/(?:_| )(\d+)(?:[-_](\d+))?$/);
+            const startPage = pageMatch ? parseInt(pageMatch[1], 10) : null;
+            const endPage = pageMatch?.[2]
+              ? parseInt(pageMatch[2], 10)
+              : startPage;
+
+            // Step 1: Remove the trailing _page or _page-range from filename
+            const cleaned = fileName.replace(/(_|\s)\d+([-_\d]*)$/, '');
+
+            // Step 2: Remove boilerplate prefixes like Mohan R BGV Doc etc
+            const parts = cleaned.split(/[_\s]+/);
+            const keywordsToDrop = ['mohan', 'r', 'bgv', 'doc'];
+            const nameParts = parts.filter(
+              (p: any) => !keywordsToDrop.includes(p.toLowerCase())
+            );
+            const finalName = nameParts.join('-');
+
+            // Handle fallback if page numbers weren't found in name
+            const pageStart = f.start_page ?? startPage ?? 1;
+            const pageEnd =
+              f.is_multipage && f.end_page
+                ? f.end_page
+                : f.start_page ?? endPage ?? startPage ?? 1;
+
+            return {
+              start: pageStart,
+              end: pageEnd,
+              name: finalName.trim(),
+            };
+          });
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        console.error('API Error:', error);
+      },
+    });
+  }
+
+  isLoading: boolean = false;
 }

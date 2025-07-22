@@ -1,3 +1,7 @@
+<div *ngIf="isLoading" class="loading-overlay">
+  <p>🔄 Processing documents... Please wait.</p>
+</div>
+
 <div class="pdf-container">
   <pdf-viewer
     class="pdf-viewer"
@@ -13,16 +17,52 @@
   ></pdf-viewer>
 
   <div class="split-layout" *ngIf="pdfLoaded">
-    <!-- 📌 LEFT: Metadata sidebar -->
     <div class="meta-panel">
-      <div *ngFor="let section of sections; let i = index" class="meta-item">
-        <strong>{{ section.name }}</strong><br />
-        Page: {{ section.start }} - {{ section.end }}
+      <div
+        *ngFor="let section of tempSections; let i = index"
+        class="meta-item"
+        (click)="toggleSection(i)"
+      >
+        <div class="meta-header">
+          <ng-container *ngIf="editingIndex !== i">
+            <span class="meta-title"> {{ section.name }} </span>
+            <span class="meta-edit" (click)="enableEdit(i, $event)">✏️</span>
+          </ng-container>
+
+          <ng-container *ngIf="editingIndex === i">
+            <input
+              [(ngModel)]="resSections[i].name"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="disableEdit()"
+              class="meta-input"
+            />
+            <button class="meta-confirm" (click)="disableEdit()">✅</button>
+          </ng-container>
+        </div>
+
+        <div *ngIf="isExpanded(i)" class="meta-details">
+          Page: {{ section.start }}<span *ngIf="section.end">
+            - {{ section.end }}</span
+          >
+        </div>
       </div>
     </div>
 
     <!-- 📄 RIGHT: PDF strip -->
     <div class="pdf-strip-wrapper">
+      <!-- 🔍 Minimal Zoom Slider -->
+      <div class="zoom-controls">
+        <button (click)="adjustZoom(-0.1)">−</button>
+        <input
+          type="range"
+          [min]="0.25"
+          [max]="0.95"
+          [step]="0.05"
+          [(ngModel)]="zoomLevel"
+        />
+        <button (click)="adjustZoom(0.1)">＋</button>
+      </div>
+
       <div class="pdf-strip" #pdfStrip>
         <div
           *ngFor="let line of splitLines; let i = index"
@@ -37,6 +77,16 @@
         <ng-container *ngFor="let page of pages; let i = index">
           <div class="snap-target debug" #snapTarget></div>
           <div class="pdf-box">
+            <div
+              style="
+                text-align: center;
+                font-size: 0.9rem;
+                color: #629beb;
+                margin-top: 10px;
+              "
+            >
+              {{ page }}
+            </div>
             <pdf-viewer
               [src]="pdfSrc"
               [zoom]="zoomLevel"
@@ -45,10 +95,10 @@
               [original-size]="false"
               [render-text]="true"
               [ngStyle]="{
-    width: '300px',
-    height: '400px',
-    'margin-top': getZoomMarginPercent(zoomLevel)
-  }"
+      width: '300px',
+      height: '400px',
+      'margin-top': getZoomMarginPercent(zoomLevel)
+    }"
             ></pdf-viewer>
           </div>
         </ng-container>
@@ -56,5 +106,11 @@
         <div class="snap-target debug" #snapTarget></div>
       </div>
     </div>
+  </div>
+  <div class="split-actions">
+    <button class="action-btn left" (click)="onSaveSplit()">
+      💾 Save New Split
+    </button>
+    <button class="action-btn right">⬇️ Download Split Files</button>
   </div>
 </div>
