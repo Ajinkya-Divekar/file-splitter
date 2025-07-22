@@ -147,16 +147,46 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     this.splitLines.push({ x: end, locked: true });
   }
 
+  onDragStart(index: number) {
+    const line = this.splitLines[index];
+    this.originalXMap.set(index, line.x);
+  }
+
   onDragEnd(event: CdkDragEnd, index: number) {
     const container = this.pdfStripRef.nativeElement as HTMLElement;
-    const draggedX =
-      event.source.element.nativeElement.getBoundingClientRect().left;
-    const containerX = container.getBoundingClientRect().left;
-    let relativeX = draggedX - containerX + container.scrollLeft;
+    const draggedEl = event.source.element.nativeElement as HTMLElement;
+    const draggedRect = draggedEl.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
 
-    const maxX = container.scrollWidth - 1;
-    relativeX = Math.max(0, Math.min(relativeX, maxX));
+    // Calculate relativeX to container
+    let relativeX =
+      draggedRect.left - containerRect.left + container.scrollLeft;
 
+    // Drop is invalid if outside the vertical bounds
+    const outOfBounds =
+      draggedRect.bottom < containerRect.top ||
+      draggedRect.top > containerRect.bottom;
+
+    const originalX = this.originalXMap.get(index) ?? this.splitLines[index].x;
+
+    if (outOfBounds) {
+      // ❌ Invalid drop → Reset position visually
+      draggedEl.style.transition = 'transform 0.2s ease';
+      draggedEl.style.transform = `translateX(${originalX}px)`;
+
+      // Also reset in model
+      this.splitLines[index].x = originalX;
+
+      setTimeout(() => {
+        draggedEl.style.transition = '';
+        draggedEl.style.transform = '';
+      }, 200);
+
+      this.snapPointElements.forEach((el) => (el.style.visibility = 'hidden'));
+      return;
+    }
+
+    // Snap to nearest valid snap point
     let nearest = this.snapPoints[0];
     let minDiff = Math.abs(relativeX - nearest);
     let nearestIndex = 0;
@@ -173,7 +203,7 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     const draggedLine = this.splitLines[index];
     const originalIndex = this.snapPoints.indexOf(draggedLine.x);
 
-    // Check: don't allow leftmost line to move left
+    // Protect boundary: don't let leftmost go further left or rightmost go right
     const sorted = this.splitLines
       .map((l, i) => ({ x: l.x, i }))
       .sort((a, b) => a.x - b.x);
@@ -184,7 +214,15 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
       (isLeftmost && nearestIndex <= originalIndex) ||
       (isRightmost && nearestIndex >= originalIndex)
     ) {
-      // Abort move
+      // Snap back
+      draggedEl.style.transition = 'transform 0.2s ease';
+      draggedEl.style.transform = `translateX(${originalX}px)`;
+      this.splitLines[index].x = originalX;
+      setTimeout(() => {
+        draggedEl.style.transition = '';
+        draggedEl.style.transform = '';
+      }, 200);
+
       this.snapPointElements.forEach((el) => (el.style.visibility = 'hidden'));
       return;
     }
@@ -196,13 +234,23 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
       draggedLine.x = nearest;
     }
 
+    // Remove overlapping lines
     const min = Math.min(originalIndex, nearestIndex);
     const max = Math.max(originalIndex, nearestIndex);
-
     this.splitLines = this.splitLines.filter((line, i) => {
       const snapIdx = this.snapPoints.indexOf(line.x);
       if (i === index) return true;
       return snapIdx <= min || snapIdx >= max;
+    });
+
+    const overlapThreshold = 1;
+    const seen = new Set<number>();
+    this.splitLines = this.splitLines.filter((line) => {
+      for (const sx of seen) {
+        if (Math.abs(sx - line.x) <= overlapThreshold) return false;
+      }
+      seen.add(line.x);
+      return true;
     });
 
     this.snapPointElements.forEach((el, i) => {
@@ -212,39 +260,50 @@ export class SplitReviewer implements AfterViewInit, AfterViewChecked {
     this.printSegments();
   }
 
+  private originalXMap = new Map<number, number>();
+
   printSegments() {
     console.log('printing segments');
 
-    if (!this.pages.length) return;
+    const sorted = this.splitLines
+      .map((s) => this.snapPoints.indexOf(s.x))
+      .filter((i) => i !== -1)
+      .sort((a, b) => a - b);
 
-    const totalPages = this.pages.length;
+    const segments = [];
+    const meta = [];
 
-    const enriched = this.resSections.map((section, index, arr) => {
-      const start = section.start;
-      const end =
-        index < arr.length - 1 ? arr[index + 1].start - 1 : totalPages;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const from = sorted[i];
+      const to = sorted[i + 1];
 
-      // Extract clean name — keep only last part before page range
-      const rawName = section.name;
-      const cleanedName = rawName
-        .replace(/[_\\]/g, ' ') // Replace _ or \ with space (in case of paths)
-        .split(' ')
-        .filter((part) => !/^\d+(-\d+)*$/.test(part)) // Remove page range parts
-        .slice(-1)[0]; // Take last non-numbery chunk
+      if (from >= 0 && to > from && to <= this.pages.length) {
+        const startPage = this.pages[from];
+        const endPage = this.pages[to - 1];
 
-      return {
-        start,
-        end,
-        name: cleanedName || `Section ${index + 1}`,
-      };
-    });
+        // Try to find matching resSection based on startPage
+        const matched = this.resSections.find((r) => r.start === startPage);
+        let name = matched?.name || `Section ${i + 1}`;
 
-    this.sections = enriched;
+        // Extract clean name
+        name =
+          name
+            .replace(/[_\\]/g, ' ')
+            .split(' ')
+            .filter((part) => !/^\d+(-\d+)*$/.test(part))
+            .slice(-1)[0] || `Section ${i + 1}`;
 
-    // Optional: Log each section with pages
-    const segments = enriched.map(({ start, end }) =>
-      this.pages.slice(start - 1, end)
-    );
+        meta.push({
+          start: startPage,
+          end: endPage,
+          name,
+        });
+
+        segments.push(this.pages.slice(from, to));
+      }
+    }
+
+    this.sections = meta;
 
     console.log('Split Segments:', segments);
   }

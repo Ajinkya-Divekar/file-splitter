@@ -30,6 +30,7 @@
           [ngStyle]="{ transform: 'translateX(' + line.x + 'px)' }"
           cdkDrag
           [cdkDragLockAxis]="'x'"
+          (cdkDragStarted)="onDragStart(i)"
           (cdkDragEnded)="onDragEnd($event, i)"
         ></div>
 
