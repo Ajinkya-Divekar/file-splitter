@@ -19,7 +19,7 @@
   <div class="split-layout" *ngIf="pdfLoaded">
     <div class="meta-panel">
       <div
-        *ngFor="let section of tempSections; let i = index"
+        *ngFor="let section of resSections; let i = index"
         class="meta-item"
         (click)="toggleSection(i)"
       >
