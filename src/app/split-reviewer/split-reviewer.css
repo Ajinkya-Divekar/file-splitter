@@ -1,5 +1,4 @@
 .pdf-container {
-  width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -23,10 +22,12 @@
   position: relative;
   align-items: center;
   margin-right: 10px;
-  gap: 10px;
+  gap: 2px;
 }
 
 .pdf-box {
+  min-width: 320px; /* or whatever width fits your pdf nicely */
+  flex: 0 0 auto;
   background: #f0faff;
   border: 1px solid #fafcff;
   border-radius: 8px;
@@ -34,7 +35,7 @@
   padding: 6px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
   transition: transform 0.2s ease;
-  gap: 4px;
+  gap: 1px;
   height: 450px;
 }
 

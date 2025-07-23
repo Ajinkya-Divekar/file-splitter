@@ -33,17 +33,19 @@
             <input
               [(ngModel)]="resSections[i].name"
               (click)="$event.stopPropagation()"
-              (keydown.enter)="disableEdit()"
+              (keydown.enter)="disableEdit(i)"
               class="meta-input"
             />
-            <button class="meta-confirm" (click)="disableEdit()">✅</button>
+            <button class="meta-confirm" (click)="disableEdit(i)">✅</button>
           </ng-container>
         </div>
 
         <div *ngIf="isExpanded(i)" class="meta-details">
-          Page: {{ section.start }}<span *ngIf="section.end">
-            - {{ section.end }}</span
-          >
+          <ng-container *ngIf="editingIndex !== i">
+            Page: {{ section.start }}<span *ngIf="section.end">
+              - {{ section.end }}</span
+            >
+          </ng-container>
         </div>
       </div>
     </div>
