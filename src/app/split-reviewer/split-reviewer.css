@@ -6,6 +6,11 @@
   font-family: "Segoe UI", sans-serif;
 }
 
+.pdf-viewer {
+  display: flex;
+  align-items: center;
+}
+
 .pdf-strip-wrapper {
   flex: 1;
   display: flex;
@@ -20,13 +25,13 @@
 .pdf-strip {
   display: flex;
   position: relative;
-  align-items: center;
   margin-right: 10px;
   gap: 2px;
 }
 
 .pdf-box {
-  min-width: 320px; /* or whatever width fits your pdf nicely */
+  min-width: 350px; /* or whatever width fits your pdf nicely */
+  height: auto; /* changed */
   flex: 0 0 auto;
   background: #f0faff;
   border: 1px solid #fafcff;
@@ -36,7 +41,16 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
   transition: transform 0.2s ease;
   gap: 1px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
   height: 450px;
+}
+
+.pdf-box.focused {
+  border: 2px solid #468dff;
+  border-radius: 4px;
+  box-shadow: 0 0 6px rgba(70, 141, 255, 0.5);
 }
 
 .pdf-box:hover {

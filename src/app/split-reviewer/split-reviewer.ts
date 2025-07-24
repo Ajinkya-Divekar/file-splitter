@@ -38,6 +38,58 @@ export class SplitReviewer implements OnInit, AfterViewInit, AfterViewChecked {
   @ViewChildren('snapTarget', { read: ElementRef })
   snapTargets!: QueryList<ElementRef>;
 
+  focusedPageIndex: number | null = null;
+  baseZoom: number = 0.9;
+  focusedZoom: number = 0.95;
+
+  adjustFocusedZoom(delta: number) {
+    if (this.focusedPageIndex === null) return;
+    this.focusedZoom = Math.min(Math.max(this.focusedZoom + delta, 0.25), 2);
+  }
+
+  // New: Jump to the given page in the PDF strip viewer
+  jumpToSectionPage(pageNumber: number, index: number): void {
+    const pageIndex = this.pages.indexOf(pageNumber);
+    if (pageIndex === -1) {
+      console.warn(`Page number ${pageNumber} not found.`);
+      return;
+    }
+
+    const snapTargetsArray = this.snapTargets.toArray();
+    if (pageIndex < 0 || pageIndex >= snapTargetsArray.length) {
+      console.warn(`Invalid snap target.`);
+      return;
+    }
+
+    const targetElement = snapTargetsArray[pageIndex]
+      .nativeElement as HTMLElement;
+
+    if (!targetElement) {
+      console.warn('Target DOM element not found.');
+      return;
+    }
+
+    // Smoothly scroll so this page is visible and centered horizontally
+    targetElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+
+    // Update focused visuals and zoom
+    this.focusedZoom = this.baseZoom; // Adjust as needed
+
+    this.toggleSection(index);
+  }
+
+  toggleFocus(i: number) {
+    if (this.focusedPageIndex === i) {
+      this.focusedPageIndex = null; // Unfocus if same page clicked
+    } else {
+      this.focusedPageIndex = i; // Focus new page
+    }
+  }
+
   pdfLoaded = false;
   snapPoints: number[] = [];
   snapPointElements: HTMLElement[] = [];
@@ -58,9 +110,7 @@ export class SplitReviewer implements OnInit, AfterViewInit, AfterViewChecked {
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.sendFolderPath(
-      'C:/Users/ajink/OneDrive/Desktop/file-splitter/src/assets/documents'
-    );
+    this.sendFolderPath('../../assets/documents');
   }
 
   onPdfLoadComplete(pdf: any): void {
