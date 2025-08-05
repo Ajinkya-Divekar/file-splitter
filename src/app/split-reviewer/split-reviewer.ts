@@ -14,6 +14,7 @@ import { DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import samplePdf from '../../assets/documents/Mohan R_ BGV Doc.pdf';
+import { DomSanitizer } from '@angular/platform-browser';
 
 interface SplitLine {
   x: number;
@@ -98,7 +99,9 @@ export class SplitReviewer implements OnInit, AfterViewInit, AfterViewChecked {
   originalXMap = new Map<number, number>();
   pages: number[] = [];
 
-  pdfSrc = samplePdf; // ✅ Recommend relative path
+  // pdfSrc =
+  //   'https://pblc.factsuite360.net/Filefac40cbcfcd6fb468ee851aa884fef4a_aadhar.pdf'; // ✅ Recommend relative path
+  pdfSrc: string | undefined;
   zoomLevel = 0.95;
 
   tempResData: any = null;
@@ -107,10 +110,197 @@ export class SplitReviewer implements OnInit, AfterViewInit, AfterViewChecked {
   expandedSections: Set<number> = new Set();
   isLoading = false;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private sanitizer: DomSanitizer) {}
+
+  inputPdfUrl: string = ''; // For input binding
+
+  loadPdfFromUrl() {
+    if (!this.inputPdfUrl) {
+      console.warn('No URL entered.');
+      return;
+    }
+
+    this.sendFolderPath(this.inputPdfUrl);
+  }
+
+  updateSinglePageRanges(data: any): void {
+    data.output_files.forEach((file: any) => {
+      if (!file.is_multipage) {
+        const match = file.path.match(/_(\d+)\.pdf$/);
+        if (match && match[1]) {
+          const pageNum = parseInt(match[1], 10);
+          file.start_page = pageNum;
+          file.end_page = pageNum;
+        } else {
+          console.warn('Could not extract page number from path:', file.path);
+        }
+      }
+    });
+  }
 
   ngOnInit() {
-    this.sendFolderPath('../../assets/documents');
+    // this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfSrc);
+
+    this.tempResData = {
+      input_tokens: 9850,
+      output_files: [
+        {
+          end_page: 1,
+          is_multipage: false,
+          //https://pblc.factsuite360.net/test_folder/Mohan%20R_%20BGV%20Doc.pdf
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_document-checklist_1.pdf',
+          start_page: 1,
+        },
+        {
+          end_page: 5,
+          is_multipage: true,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_employment-verification-form_2-3-4-5.pdf',
+          start_page: 2,
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_employment-screening-consent-form_6.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_sslc-marks-card_7.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_master-of-engineering-degree-certificate_8.pdf',
+        },
+        {
+          end_page: 13,
+          is_multipage: true,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_master-of-engineering-semester-grade-reports_9-10-11-12-13.pdf',
+          start_page: 9,
+        },
+        {
+          end_page: 19,
+          is_multipage: true,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_diploma-semester-mark-sheets_14-15-16-17-18-19.pdf',
+          start_page: 14,
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_diploma-certificate_20.pdf',
+        },
+        {
+          end_page: 26,
+          is_multipage: true,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_bachelor-of-engineering-semester-grade-cards_21-22-23-24-25-26.pdf',
+          start_page: 21,
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_bachelor-of-engineering-degree-certificate_27.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_aadhar-card_28.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_pan-card_29.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_relieving-letter_30.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_service-certificate_31.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_service-certificate_32.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_relieving-letter_33.pdf',
+        },
+        {
+          is_multipage: false,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_relieving-letter_34.pdf',
+        },
+        {
+          end_page: 37,
+          is_multipage: true,
+          original_file_path:
+            '/data/publicfolder/test_folder/Mohan R_ BGV Doc.pdf',
+          path: '/data/publicfolder/test_folder/Mohan R_ BGV Doc_payslips_35-36-37.pdf',
+          start_page: 35,
+        },
+      ],
+      output_tokens: 1590,
+      status: 'success',
+      status_code: '200',
+      total_tokens: 17110,
+    };
+
+    this.updateSinglePageRanges(this.tempResData);
+
+    const localPath = this.tempResData.output_files[0]?.original_file_path;
+
+    const remotePdfUrl = localPath.replace(
+      '/data/publicfolder/',
+      'https://pblc.factsuite360.net/'
+    );
+
+    // const remotePdfUrl =
+    //   'https://pblc.factsuite360.net/Filefac40cbcfcd6fb468ee851aa884fef4a_aadhar.pdf';
+
+    this.http
+      .post(
+        'https://tcg-node.onrender.com/api/pdf-proxy',
+        { url: remotePdfUrl },
+        { responseType: 'blob' }
+      )
+      .subscribe({
+        next: (blob) => {
+          console.log(remotePdfUrl);
+          this.pdfSrc = URL.createObjectURL(blob);
+          console.log(this.pdfSrc);
+          // this.pdfSrc = samplePdf;
+        },
+        error: (err) => {
+          console.error('Failed to load PDF', err);
+        },
+      });
   }
 
   onPdfLoadComplete(pdf: any): void {
